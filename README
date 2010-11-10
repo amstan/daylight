@@ -1,0 +1,20 @@
+# System Overview
+## Harvester
+ * MCU
+ * Driver > Stepper Motor
+ * 2 light sensors
+ * USB?
+ * UI
+ * Transmitter
+
+## Lamp
+ * MCU
+ * driverx3>LED RGB
+ * driverx4>LED RGBA
+ * USB
+ * UI
+ * Receiver
+
+# Misc
+Version control: http://git-scm.com/
+Programmer: http://www.microchip.com/pickit2.
