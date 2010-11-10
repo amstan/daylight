@@ -111,11 +111,6 @@ OBJS         = $(OBJS_C) $(OBJS_ASM)
 CLEAN_ASMS   = $(SRCS_C:.c=.asm)
 #
 #----------------------------------------------------------------------------
-# Current datetime for creating archive
-#
-DATETIME     = $(shell date +%Y_%m_%d_%H%M%S)
-#
-#----------------------------------------------------------------------------
 # Redefine the compiler
 #
 CC           = $(SDCC)
@@ -172,7 +167,7 @@ $(PRJ).hex: $(OBJS)
 #
 clean:
 	-rm -f *.o $(CLEAN_ASMS) *.lst *.p *.d *.cod *.hex *.c~ *.asm~ *.map \
-	*.cof *.dasm *.dump* $(DEPFILES)*
+	*.cof *.dasm *.dump* $(DEPFILES)* *.adb
 	-rmdir $(DEPDIR)
 	@echo "------ Project directory cleaned."
 #
@@ -180,13 +175,6 @@ clean:
 # Creating a snapshot of the current state of the project,in the upper folder.
 # Can be useful for archiving earlier versions of the project.
 #
-dist:
-#	@pwd=$$(pwd); cd ..; tar cjf $$pwd-$(DATETIME).tar.bz2 $$(basename $$pwd);\
-#	echo "------ Dist created: $$pwd-$(DATETIME).tar.bz2"
-	@pwd=$$(pwd); cd ..; tar czf $$pwd-$(DATETIME).tar.gz $$(basename $$pwd);\
-	echo "------ Dist created: $$pwd-$(DATETIME).tar.gz"
-#
-
 burn:	$(PRJ).hex
 	@echo "------ Burning of $(PRJ).hex started."
 	$(BURN) $(BURN_FLAGS) -F$(PRJ).hex
