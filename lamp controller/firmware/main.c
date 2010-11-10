@@ -1,5 +1,15 @@
-#include <pic16f88.h>
+#define __16f88
+#include "pic/pic16f88.h"
 #include "bitop.h"
+
+typedef unsigned int config;
+config at 0x2007 __CONFIG = _CP_OFF & 
+ _WDT_OFF & 
+ _BODEN_OFF & 
+ _PWRTE_OFF & 
+ _INTRC_IO & 
+ _MCLR_ON & 
+ _LVP_OFF;
 
 void delay(int count) {
 	int i,j;
@@ -9,13 +19,16 @@ void delay(int count) {
 
 void main(void) {
 	//initialize the ports
-	TRISB=0b1111111;
-	TRISA=0b1111110;
-	PORTA=0b0000000;
-	PORTB=0b0000000;
+	OSCCON=0b01110010; //Speed up the cpu so the delay code is not slow
+	
+	TRISA=0b11111111;
+	PORTA=0b00000000;
+	
+	TRISB=0b11111101;
+	PORTB=0x00000010;
 	
 	while(1) {
-		delay(10);
-		toggle_bit(PORTA,0);
+		delay(5);
+		toggle_bit(PORTB,1);
 	}
 }

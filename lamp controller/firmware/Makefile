@@ -63,7 +63,7 @@ SDCC         = sdcc
 GPASM        = gpasm
 GPDASM       = gpdasm
 GPLINK       = gplink
-BURN         = pk2cmd
+PROGRAMMER   = pk2cmd
 #
 #----------------------------------------------------------------------------
 # We should link against these libraries.
@@ -89,7 +89,8 @@ LIBS         = libsdcc.lib pic$(CPU).lib
 SDCC_FLAGS   =  -S -m$(ARCH) -p$(CPU) --debug -c
 GPASM_FLAGS  = -g
 GPLINK_FLAGS = -c -m -w -r -I $(LIBDIR) -s $(GPUTILSDIR)/lkr/$(CPU).lkr
-BURN_FLAGS = -M -Ppic$(CPU) -J -R 
+PROGRAMMER_FLAGS = -Ppic$(CPU) -J 
+RUN_VOLTAGE = 5.0
 #
 ###############################################################################
 #
@@ -170,15 +171,24 @@ clean:
 	*.cof *.dasm *.dump* $(DEPFILES)* *.adb
 	-rmdir $(DEPDIR)
 	@echo "------ Project directory cleaned."
+
 #
 #----------------------------------------------------------------------------
-# Creating a snapshot of the current state of the project,in the upper folder.
-# Can be useful for archiving earlier versions of the project.
-#
-burn:	$(PRJ).hex
+# Programmer functions
+# 
+program: $(PRJ).hex
 	@echo "------ Burning of $(PRJ).hex started."
-	$(BURN) $(BURN_FLAGS) -F$(PRJ).hex
+	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -M -F$(PRJ).hex
 	@echo "------ Burning of $(PRJ).hex finished."
+
+run:
+	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -A$(RUN_VOLTAGE) -T
+
+stop:
+	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -A$(RUN_VOLTAGE) -R
+
+verify:
+	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -R -Y -F$(PRJ).hex
 
 .PHONY: all clean dist
 #
