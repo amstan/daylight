@@ -182,7 +182,7 @@ program: $(PRJ).hex
 	@echo "------ Burning of $(PRJ).hex finished."
 
 run:
-	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -A$(RUN_VOLTAGE) -T
+	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -A$(RUN_VOLTAGE) -T -R
 
 stop:
 	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -A$(RUN_VOLTAGE) -R
