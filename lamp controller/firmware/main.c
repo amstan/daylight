@@ -2,6 +2,8 @@
 #include "pic/pic16f88.h"
 #include "bitop.h"
 
+# include "uart.c"
+
 typedef unsigned int config;
 config at 0x2007 __CONFIG = _CP_OFF & 
  _WDT_OFF & 
@@ -11,14 +13,31 @@ config at 0x2007 __CONFIG = _CP_OFF &
  _MCLR_ON & 
  _LVP_OFF;
 
+void intHand(void) __interrupt 0
+{
+   if (RCIF) {
+        RCIE = 0;
+        Usart_Read_Send();
+        RCIE = 1;
+    }
+}
+
 #define COLOURPORT PORTB
 #define RED 0
 #define GREEN 1
-#define BLUE 2
+#define BLUE 3
 
-int abs(int x) {
-	if(x<0) x*=-1;
-	return x;
+void setup(void) {
+	OSCCON=0b01110000; //8MHz
+
+	//Ports
+	TRISA=0b11111111;
+	PORTA=0b00000000;
+ 	TRISB=0b11110100;
+	PORTB=0b00000000;
+	
+	Usart_Init(bd9600);
+	Usart_Str_tx("Booted!\n");
 }
 
 void main(void) {
@@ -27,15 +46,9 @@ void main(void) {
 	
 	long int r,g,b,cycle;
 	long int steps,step; //used for animation
+	char a;
 	
-	//initialize the ports
-	OSCCON=0b01110000; //Speed up the cpu so the delay code is not slow
-	
-	TRISA=0b11111111;
-	PORTA=0b00000000;
-	
-	TRISB=0b11111000;
-	PORTB=0b00000000;
+	setup();
 	
 	cycle=255;
 	r=255;
@@ -45,14 +58,10 @@ void main(void) {
 	steps=0;
 	step=1;
 	
+	//while(1)
+	//	Usart_Write(Usart_Read());
+	
 	while(1) {
-		//animate
-		steps+=step;
-		if ((steps==1023)||(steps==0))
-			step*=-1;
-		
-		r=steps/4;
-		
 		//pwm
 		if(r>0) set_bit(COLOURPORT,RED);
 		if(g>0) set_bit(COLOURPORT,GREEN);
@@ -65,6 +74,17 @@ void main(void) {
 			if(i==b)
 				clear_bit(COLOURPORT,BLUE);
 			for(t=0;t<5;t++);
+		}
+		if(Usart_Data_Ready()) {
+			clear_bit(COLOURPORT,RED);
+			clear_bit(COLOURPORT,GREEN);
+			clear_bit(COLOURPORT,BLUE);
+			
+			r=Usart_Read(); Usart_Str_tx("r");
+			g=Usart_Read(); Usart_Str_tx("g");
+			b=Usart_Read(); Usart_Str_tx("b");
+			
+			Usart_Str_tx(" New Colour!\n");
 		}
 	}
 }
