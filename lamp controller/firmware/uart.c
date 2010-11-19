@@ -59,11 +59,11 @@ void Usart_Init(const unsigned int baudrate)
                       BRGH = 1;
 
         }
-     TXSTA = TXSTA | 0x20;
+     TXEN = 1;
 
      RCIF = 0;
-     PEIE = 1;
-     GIE  = 1;
+     PEIE = 0;
+     GIE  = 0;
 
 }
 void Usart_OFF(void)
@@ -77,7 +77,7 @@ unsigned char Usart_Data_Ready(void)
 
 void Usart_Write( unsigned char _data)
 {
-  while((!TRMT)&& TXEN);   // loop until the register get's emptied
+  while(!TXIF);   // loop until the register get's emptied
 
    TXREG = _data;          // this action clears TXIF also;
 
@@ -94,7 +94,7 @@ _usrtReadx:
 if (OERR) {CREN = 0; CREN = 1;} // reset overrun error flag if raised
 rx = RCREG;
 //RCIE = 1;                     // re -enable interrupt
-return RCREG;
+return rx;
 }
 void Usart_Str_tx(unsigned char *str)
 { /* sends out zero-terminated string*/

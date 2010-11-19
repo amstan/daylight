@@ -40,6 +40,22 @@ void setup(void) {
 	Usart_Str_tx("Booted!\n");
 }
 
+print_number(unsigned char number) {
+    unsigned char digit;
+    
+    digit=number/100;
+    number%=100;
+    Usart_Write(digit+'0');
+    
+    digit=number/10;
+    number%=10;
+    Usart_Write(digit+'0');
+    
+    Usart_Write(number+'0');
+    
+    Usart_Write(' ');
+}
+
 void main(void) {
 	int i;
 	int t; //use for a crude delay
@@ -57,9 +73,6 @@ void main(void) {
 	
 	steps=0;
 	step=1;
-	
-	//while(1)
-	//	Usart_Write(Usart_Read());
 	
 	while(1) {
 		//pwm
@@ -80,9 +93,20 @@ void main(void) {
 			clear_bit(COLOURPORT,GREEN);
 			clear_bit(COLOURPORT,BLUE);
 			
-			r=Usart_Read(); Usart_Str_tx("r");
-			g=Usart_Read(); Usart_Str_tx("g");
-			b=Usart_Read(); Usart_Str_tx("b");
+			r=Usart_Read();
+			set_bit(COLOURPORT,RED);
+			Usart_Str_tx("r");
+            print_number(r);
+			
+			g=Usart_Read();
+			set_bit(COLOURPORT,GREEN);
+			Usart_Str_tx("g");
+            print_number(g);
+			
+			b=Usart_Read();
+			set_bit(COLOURPORT,BLUE);
+			Usart_Str_tx("b");
+            print_number(b);
 			
 			Usart_Str_tx(" New Colour!\n");
 		}
