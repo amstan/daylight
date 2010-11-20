@@ -67,8 +67,8 @@ void main(void) {
 	setup();
 	
 	cycle=255;
-	r=255;
-	g=255;
+	r=0;
+	g=128;
 	b=255;
 	
 	steps=0;
@@ -87,28 +87,6 @@ void main(void) {
 			if(i==b)
 				clear_bit(COLOURPORT,BLUE);
 			for(t=0;t<5;t++);
-		}
-		if(Usart_Data_Ready()) {
-			clear_bit(COLOURPORT,RED);
-			clear_bit(COLOURPORT,GREEN);
-			clear_bit(COLOURPORT,BLUE);
-			
-			r=Usart_Read();
-			set_bit(COLOURPORT,RED);
-			Usart_Str_tx("r");
-            print_number(r);
-			
-			g=Usart_Read();
-			set_bit(COLOURPORT,GREEN);
-			Usart_Str_tx("g");
-            print_number(g);
-			
-			b=Usart_Read();
-			set_bit(COLOURPORT,BLUE);
-			Usart_Str_tx("b");
-            print_number(b);
-			
-			Usart_Str_tx(" New Colour!\n");
 		}
 	}
 }

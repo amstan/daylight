@@ -43,8 +43,8 @@ ARCH         = pic14
 # Normally they are installed into /usr/share
 # In my case I have built sdcc under my home.
 #
-SDCCDIR      = /usr/share/sdcc
-GPUTILSDIR   = /usr/share/gputils
+SDCCDIR      = /usr/local/share/sdcc
+GPUTILSDIR   = /usr/local/share/gputils
 #
 #----------------------------------------------------------------------------
 # Adjust according to architecture 14bit (pic) or 16bit (pic16)
@@ -52,8 +52,8 @@ GPUTILSDIR   = /usr/share/gputils
 #INCLUDEDIR   = $(SDCCDIR)/include/pic
 #LIBDIR       = $(SDCCDIR)/lib/pic
 
-INCLUDEDIR   = $(SDCCDIR)/include/pic
-LIBDIR       = $(SDCCDIR)/lib/pic
+INCLUDEDIR   = $(SDCCDIR)/include
+LIBDIR       = $(SDCCDIR)/lib
 #
 #----------------------------------------------------------------------------
 # Defining the tools, you may have several version installed
@@ -70,7 +70,7 @@ PROGRAMMER   = pk2cmd
 # If custom startup code is used crt0i.o should be removed and
 # the new crt module should be added to the SRCS_ASM line.
 #
-LIBS         = libsdcc.lib pic$(CPU).lib
+LIBS         = $(LIBDIR)/pic/libsdcc.lib $(LIBDIR)/pic/pic$(CPU).lib
 #
 #----------------------------------------------------------------------------
 # Flags sdcc:
