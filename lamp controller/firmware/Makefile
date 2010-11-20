@@ -1,196 +1,383 @@
-###############################################################################
+# Makefile copied from WinAVR Sample makefile written by Eric B. Weddington, J�rg Wunsch, et al.
+# Released to the Public Domain
 #
-#	Modified by KPL, few more flags added to compilation/linking;
-#	section "burn" added, so command "make burn" could compile and link sources,
-#	and then burn them to PIC, using pk2cmd and pickit2 programmer.
+# On command line:
 #
-# PIC compile makefile for use with SDCC and GPUTILS
-# You can find an dummy projects at http://szokesandor.hu/sdcc
-#
-# C2006.12.02. [EMAIL PROTECTED]
-# C2008.03.22. [EMAIL PROTECTED]
-#
-# Please send bug reports or comments to the author.
-# If you improved this makefile, please send the updates back to the author!
-#
-# Licensed under the GNU GPL V2 or later
-#
-#
-#----------------------------------------------------------------------------
-# Name of the .hex file without extention
-#
-PRJ          = daylight
-#
-#-----------------------------------------------------------------------------
-# Used modules, the first should contain the main() function
-# Assembly modules should have extention ".S", because the current clean up!
-#
-SRCS_C       := main.c
-SRCS_ASM     :=
-#
-#----------------------------------------------------------------------------
-# Type of the used cpu
-#
-CPU          = 16f88
-#
-#----------------------------------------------------------------------------
-# Type of the architecture eg. -mpic14 or -mpic16
-#
-ARCH         = pic14
-#
-#----------------------------------------------------------------------------
-# Adjust to sdcc data dir and to gputils dir.
-# Normally they are installed into /usr/share
-# In my case I have built sdcc under my home.
-#
-SDCCDIR      = /usr/share/sdcc
-GPUTILSDIR   = /usr/share/gputils
-#
-#----------------------------------------------------------------------------
-# Adjust according to architecture 14bit (pic) or 16bit (pic16)
-#
-#INCLUDEDIR   = $(SDCCDIR)/include/pic
-#LIBDIR       = $(SDCCDIR)/lib/pic
+# make all = Make software.
+# make clean = Clean out built project files.
+# make coff = Convert ELF to AVR COFF (for use with AVR Studio 3.x or VMLAB).
+# make extcoff = Convert ELF to AVR Extended COFF (for use with AVR Studio
+#                4.07 or greater).
+# make program = Download the hex file to the device, using avrdude.  Please
+#                customize the avrdude settings below first!
+# make filename.s = Just compile filename.c into the assembler code only
 
-INCLUDEDIR   = $(SDCCDIR)/include/pic
-LIBDIR       = $(SDCCDIR)/lib/pic
-#
-#----------------------------------------------------------------------------
-# Defining the tools, you may have several version installed
-# for different reasons (testing, production, etc.)
-#
-SDCC         = sdcc
-GPASM        = gpasm
-GPDASM       = gpdasm
-GPLINK       = gplink
-PROGRAMMER   = pk2cmd
-#
-#----------------------------------------------------------------------------
-# We should link against these libraries.
-# If custom startup code is used crt0i.o should be removed and
-# the new crt module should be added to the SRCS_ASM line.
-#
-LIBS         = libsdcc.lib pic$(CPU).lib
-#
-#----------------------------------------------------------------------------
-# Flags sdcc:
-#   -c :compile only
-#   -S :stop after assembly
-#   -V : show actual command line the compiler executing
-#   --verbose: Shows the various actions the compiler is performing
-#
-# Flags for gplink:
-#   -c :
-#   -m :
-#   -w :
-#   -r :
-#   -I dir:
-#   -s file: the linker file
-SDCC_FLAGS   =  -S -m$(ARCH) -p$(CPU) --debug -c
-GPASM_FLAGS  = -g
-GPLINK_FLAGS = -c -m -w -r -I $(LIBDIR) -s $(GPUTILSDIR)/lkr/$(CPU).lkr
-PROGRAMMER_FLAGS = -Ppic$(CPU) -J 
-RUN_VOLTAGE = 3.3
-#
-###############################################################################
-#
-# NO USER SERVICABLE SETTING BELOW THIS LINE!
-#
-# Changes hereafter can totally break your build process.
-# Modify only, if you know what are you doing!
-# If you improved this makefile, please send the updates back to the author!
-#
-DEPDIR       = .deps
-DEPFILES     = $(DEPDIR)/$(*F)
-OBJS_C       := $(SRCS_C:.c=.o)
-OBJS_ASM     = $(SRCS_ASM:.asm=.o)
-OBJS         = $(OBJS_C) $(OBJS_ASM)
-#
-#----------------------------------------------------------------------------
-# Only the generated asm files will be deleted
-#
-CLEAN_ASMS   = $(SRCS_C:.c=.asm)
-#
-#----------------------------------------------------------------------------
-# Redefine the compiler
-#
-CC           = $(SDCC)
-#
-#----------------------------------------------------------------------------
-# For dependancy, we use makedepend a bit sligthly modified
-#
-MAKEDEPEND   = touch $(DEPFILES).d && makedepend -I$(INCLUDEDIR) -Dpic$(CPU) -f$(DEPFILES).d $<
-#
-##############################################################################
-# Main target
-#
-all: $(PRJ).hex
-#all: burn
-#
-##############################################################################
-# Linking the modules alltogether
-#
-$(PRJ).hex: $(OBJS)
-	@echo "------ Linking of $(PRJ).hex started."
-	$(GPLINK) $(GPLINK_FLAGS) -o $(PRJ).hex $(OBJS) $(LIBS)
-	$(GPDASM) -p$(CPU) $(PRJ).hex > $(PRJ).dasm
-	@echo "------ Linking of $(PRJ).hex finished."
-#
-##############################################################################
-# Compiling and assembling the modules, with dependencies to its include files
-#
-# fixme: use only pipe for creating dependancy files
-# compile through asm
-#
-%.o: %.c
-	@mkdir -p $(DEPDIR)
-	@$(MAKEDEPEND); \
-	cp $(DEPFILES).d $(DEPFILES).dep; \
-	sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
-	    -e '/^$$/ d' -e 's/$$/ :/' < $(DEPFILES).d >> $(DEPFILES).dep; \
-	rm -f $(DEPFILES).d $(DEPFILES).d.bak
-	@echo "------ Compilation of $< started."
-	$(CC) $(SDCC_FLAGS) $<
-	$(GPASM) $(GPASM_FLAGS) -c $*.asm
-	@echo "------ Compilation of $< finished."
-##############################################################################
-# compiling standalone asm files into object file if needed
-#
-%.o: %.asm
-	$(GPASM) $(GPASM_FLAGS) -c $<
-#----------------------------------------------------------------------------
-# Include generated dependancy to depend on.
-#
--include $(SRCS:%.c=$(DEPDIR)/%.dep)
-#
-#----------------------------------------------------------------------------
-# Cleaning the folder, deleting all the files that can be regenerated
-#
-clean:
-	-rm -f *.o $(CLEAN_ASMS) *.lst *.p *.d *.cod *.hex *.c~ *.asm~ *.map \
-	*.cof *.dasm *.dump* $(DEPFILES)* *.adb
-	-rmdir $(DEPDIR)
-	@echo "------ Project directory cleaned."
+# MCU name
+MCU = atmega32
 
+# Processor frequency.
+#     This will define a symbol, F_CPU, in all source code files equal to the 
+#     processor frequency. You can then use this symbol in your source code to 
+#     calculate timings. Do NOT tack on a 'UL' at the end, this will be done
+#     automatically to create a 32-bit value in your source code.
+F_CPU = 8000000
+
+
+# Output format. (can be srec, ihex, binary)
+FORMAT = ihex
+
+# Target file name (without extension).
+TARGET = main
+
+# Optimization level, can be [0, 1, 2, 3, s]. 0 turns off optimization.
+# (Note: 3 is not always the best optimization level. See avr-libc FAQ.)
+#OPT = s
+OPT=s
+#OPT = 0
+
+# List C source files here. (C dependencies are automatically generated.)
+SRC = $(TARGET).c
+SRC += uart.c
+
+# You can also wrap lines by appending a backslash to the end of the line:
+#SRC += baz.c \
+#xyzzy.c
+
+
+
+# List Assembler source files here.
+# Make them always end in a capital .S.  Files ending in a lowercase .s
+# will not be considered source files but generated files (assembler
+# output from the compiler), and will be deleted upon "make clean"!
+# Even though the DOS/Win* filesystem matches both .s and .S the same,
+# it will preserve the spelling of the filenames, and gcc itself does
+# care about how the name is spelled on its command-line.
+ASRC = 
+
+
+# List any extra directories to look for include files here.
+#     Each directory must be seperated by a space.
+EXTRAINCDIRS = 
+
+
+# Optional compiler flags.
+#  -g:        generate debugging information (for GDB, or for COFF conversion)
+#  -O*:       optimization level
+#  -f...:     tuning, see gcc manual and avr-libc documentation
+#  -Wall...:  warning level
+#  -Wa,...:   tell GCC to pass this to the assembler.
+#    -ahlms:  create assembler listing
+CFLAGS = -g -O$(OPT) \
+-funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums \
+-Wall -Wstrict-prototypes \
+-Wa,-adhlns=$(<:.c=.lst) \
+$(patsubst %,-I%,$(EXTRAINCDIRS)) \
+-DF_CPU=$(F_CPU)
+
+
+# Set a "language standard" compiler flag.
+#   Unremark just one line below to set the language standard to use.
+#   gnu99 = C99 + GNU extensions. See GCC manual for more information.
+#CFLAGS += -std=c89
+#CFLAGS += -std=gnu89
+#CFLAGS += -std=c99
+CFLAGS += -std=gnu99
+
+
+
+# Optional assembler flags.
+#  -Wa,...:   tell GCC to pass this to the assembler.
+#  -ahlms:    create listing
+#  -gstabs:   have the assembler create line number information; note that
+#             for use in COFF files, additional information about filenames
+#             and function names needs to be present in the assembler source
+#             files -- see avr-libc docs [FIXME: not yet described there]
+ASFLAGS = -Wa,-adhlns=$(<:.S=.lst),-gstabs 
+
+
+
+# Optional linker flags.
+#  -Wl,...:   tell GCC to pass this to linker.
+#  -Map:      create map file
+#  --cref:    add cross reference to  map file
+LDFLAGS = -Wl,-Map=$(TARGET).map,--cref
+
+
+
+# Additional libraries
+
+# Minimalistic printf version
+#LDFLAGS += -Wl,-u,vfprintf -lprintf_min
+
+# Floating point printf version (requires -lm below)
+#LDFLAGS += -Wl,-u,vfprintf -lprintf_flt
+
+# -lm = math library
+#LDFLAGS += -lm
+
+
+
+
+# Programming support using avrdude. Settings and variables.
+
+# Programming hardware: alf avr910 avrisp bascom bsd 
+# dt006 pavr picoweb pony-stk200 sp12 stk200 stk500
 #
-#----------------------------------------------------------------------------
-# Programmer functions
-# 
-program: $(PRJ).hex
-	@echo "------ Burning of $(PRJ).hex started."
-	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -M -F$(PRJ).hex
-	@echo "------ Burning of $(PRJ).hex finished."
-
-run:
-	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -A$(RUN_VOLTAGE) -T -R
-
-stop:
-	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -A$(RUN_VOLTAGE) -R
-
-verify:
-	$(PROGRAMMER) $(PROGRAMMER_FLAGS) -R -Y -F$(PRJ).hex
-
-.PHONY: all clean dist
+# Type: avrdude -c ?
+# to get a full listing.
 #
-# end of makefile 
-###############################################################################
+AVRDUDE_PROGRAMMER = dragon_isp
+
+
+AVRDUDE_PORT = usb	   # programmer connected to serial device
+#AVRDUDE_PORT = lpt1	# programmer connected to parallel port
+
+AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
+#AVRDUDE_WRITE_EEPROM = -U eeprom:w:$(TARGET).eep
+
+AVRDUDE_FLAGS = -p $(MCU) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER)
+
+# Uncomment the following if you want avrdude's erase cycle counter.
+# Note that this counter needs to be initialized first using -Yn,
+# see avrdude manual.
+#AVRDUDE_ERASE += -y
+
+# Uncomment the following if you do /not/ wish a verification to be
+# performed after programming the device.
+#AVRDUDE_FLAGS += -V
+
+# Increase verbosity level.  Please use this when submitting bug
+# reports about avrdude. See <http://savannah.nongnu.org/projects/avrdude> 
+# to submit bug reports.
+#AVRDUDE_FLAGS += -v -v
+
+
+
+
+# ---------------------------------------------------------------------------
+
+# Define programs and commands.
+SHELL = sh
+
+CC = avr-gcc
+
+OBJCOPY = avr-objcopy
+OBJDUMP = avr-objdump
+SIZE = avr-size
+
+
+# Programming support using avrdude.
+AVRDUDE = sudo avrdude
+
+REMOVE = rm -f
+COPY = cp
+
+HEXSIZE = $(SIZE) --target=$(FORMAT) $(TARGET).hex
+#mt - use hexadecimal output-fromat // org:  ELFSIZE = $(SIZE) -A $(TARGET).elf
+ELFSIZE = $(SIZE) -x -A $(TARGET).elf
+
+
+# Define Messages
+MSG_ERRORS_NONE = Errors: none
+MSG_BEGIN = -------- begin --------
+MSG_END = --------  end  --------
+MSG_SIZE_BEFORE = Size before: 
+MSG_SIZE_AFTER = Size after:
+MSG_COFF = Converting to AVR COFF:
+MSG_EXTENDED_COFF = Converting to AVR Extended COFF:
+MSG_FLASH = Creating load file for Flash:
+MSG_EEPROM = Creating load file for EEPROM:
+MSG_EXTENDED_LISTING = Creating Extended Listing:
+MSG_SYMBOL_TABLE = Creating Symbol Table:
+MSG_LINKING = Linking:
+MSG_COMPILING = Compiling:
+MSG_ASSEMBLING = Assembling:
+MSG_CLEANING = Cleaning project:
+
+
+
+
+# Define all object files.
+OBJ = $(SRC:.c=.o) $(ASRC:.S=.o) 
+
+# Define all listing files.
+LST = $(ASRC:.S=.lst) $(SRC:.c=.lst)
+
+# Combine all necessary flags and optional flags.
+# Add target processor to flags.
+ALL_CFLAGS = -mmcu=$(MCU) -I. $(CFLAGS)
+ALL_ASFLAGS = -mmcu=$(MCU) -I. -x assembler-with-cpp $(ASFLAGS)
+
+
+
+# Default target.
+all: begin gccversion sizebefore $(TARGET).elf $(TARGET).hex $(TARGET).eep \
+	$(TARGET).lss $(TARGET).sym sizeafter finished end
+
+
+# Eye candy.
+# AVR Studio 3.x does not check make's exit code but relies on
+# the following magic strings to be generated by the compile job.
+begin:
+	@echo
+	@echo $(MSG_BEGIN)
+
+finished:
+	@echo $(MSG_ERRORS_NONE)
+
+end:
+	@echo $(MSG_END)
+	@echo
+
+
+# Display size of file.
+sizebefore:
+	@if [ -f $(TARGET).elf ]; then echo; echo $(MSG_SIZE_BEFORE); $(ELFSIZE); echo; fi
+
+sizeafter:
+	@if [ -f $(TARGET).elf ]; then echo; echo $(MSG_SIZE_AFTER); $(ELFSIZE); echo; fi
+
+
+
+# Display compiler version information.
+gccversion : 
+	@$(CC) --version
+
+
+
+
+# Convert ELF to COFF for use in debugging / simulating in
+# AVR Studio or VMLAB.
+COFFCONVERT=$(OBJCOPY) --debugging \
+	--change-section-address .data-0x800000 \
+	--change-section-address .bss-0x800000 \
+	--change-section-address .noinit-0x800000 \
+	--change-section-address .eeprom-0x810000 
+
+
+coff: $(TARGET).elf
+	@echo
+	@echo $(MSG_COFF) $(TARGET).cof
+	$(COFFCONVERT) -O coff-avr $< $(TARGET).cof
+
+
+extcoff: $(TARGET).elf
+	@echo
+	@echo $(MSG_EXTENDED_COFF) $(TARGET).cof
+	$(COFFCONVERT) -O coff-ext-avr $< $(TARGET).cof
+
+
+
+
+# Program the device.  
+program: $(TARGET).hex $(TARGET).eep
+	$(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_WRITE_FLASH) $(AVRDUDE_WRITE_EEPROM)
+	make clean
+
+
+
+
+# Create final output files (.hex, .eep) from ELF output file.
+%.hex: %.elf
+	@echo
+	@echo $(MSG_FLASH) $@
+	$(OBJCOPY) -O $(FORMAT) -R .eeprom $< $@
+
+%.eep: %.elf
+	@echo
+	@echo $(MSG_EEPROM) $@
+	-$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom="alloc,load" \
+	--change-section-lma .eeprom=0 -O $(FORMAT) $< $@
+
+# Create extended listing file from ELF output file.
+%.lss: %.elf
+	@echo
+	@echo $(MSG_EXTENDED_LISTING) $@
+	$(OBJDUMP) -h -S $< > $@
+
+# Create a symbol table from ELF output file.
+%.sym: %.elf
+	@echo
+	@echo $(MSG_SYMBOL_TABLE) $@
+	avr-nm -n $< > $@
+
+
+
+# Link: create ELF output file from object files.
+.SECONDARY : $(TARGET).elf
+.PRECIOUS : $(OBJ)
+%.elf: $(OBJ)
+	@echo
+	@echo $(MSG_LINKING) $@
+	$(CC) $(ALL_CFLAGS) $(OBJ) --output $@ $(LDFLAGS)
+
+
+# Compile: create object files from C source files.
+%.o : %.c
+	@echo
+	@echo $(MSG_COMPILING) $<
+	$(CC) -c $(ALL_CFLAGS) $< -o $@
+
+
+# Compile: create assembler files from C source files.
+%.s : %.c
+	$(CC) -S $(ALL_CFLAGS) $< -o $@
+
+
+# Assemble: create object files from assembler source files.
+%.o : %.S
+	@echo
+	@echo $(MSG_ASSEMBLING) $<
+	$(CC) -c $(ALL_ASFLAGS) $< -o $@
+
+
+
+
+
+
+# Target: clean project.
+clean: begin clean_list finished end
+
+clean_list :
+	@echo
+	@echo $(MSG_CLEANING)
+	$(REMOVE) $(TARGET).hex
+	$(REMOVE) $(TARGET).eep
+	$(REMOVE) $(TARGET).obj
+	$(REMOVE) $(TARGET).cof
+	$(REMOVE) $(TARGET).elf
+	$(REMOVE) $(TARGET).map
+	$(REMOVE) $(TARGET).obj
+	$(REMOVE) $(TARGET).a90
+	$(REMOVE) $(TARGET).sym
+	$(REMOVE) $(TARGET).lnk
+	$(REMOVE) $(TARGET).lss
+	$(REMOVE) $(OBJ)
+	$(REMOVE) $(LST)
+	$(REMOVE) $(SRC:.c=.s)
+	$(REMOVE) $(SRC:.c=.d)
+
+
+# Automatically generate C source code dependencies. 
+# (Code originally taken from the GNU make user manual and modified 
+# (See README.txt Credits).)
+#
+# Note that this will work with sh (bash) and sed that is shipped with WinAVR
+# (see the SHELL variable defined above).
+# This may not work with other shells or other seds.
+#
+%.d: %.c
+	set -e; $(CC) -MM $(ALL_CFLAGS) $< \
+	| sed 's,\(.*\)\.o[ :]*,\1.o \1.d : ,g' > $@; \
+	[ -s $@ ] || rm -f $@
+
+
+# Remove the '-' if you want to see the dependency files generated.
+-include $(SRC:.c=.d)
+
+
+
+# Listing of phony targets.
+.PHONY : all begin finish end sizebefore sizeafter gccversion coff extcoff \
+	clean clean_list program
+

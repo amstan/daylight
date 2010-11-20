@@ -1,120 +1,190 @@
-/*    SDCC USART Library for 14-bit PIC
-      written by Uncle Ho
-      ElectronicsLab.ph
-      This library is only intended for 16Mhz & 20 MHz PIC operation
-      The baudrates used are standard PC & MIDI baudrates
+/*
+ * ----------------------------------------------------------------------------
+ * "THE BEER-WARE LICENSE" (Revision 42):
+ * <joerg@FreeBSD.ORG> wrote this file.  As long as you retain this notice you
+ * can do whatever you want with this stuff. If we meet some day, and you think
+ * this stuff is worth it, you can buy me a beer in return.        Joerg Wunsch
+ * ----------------------------------------------------------------------------
+ *
+ * Stdio demo, UART implementation
+ *
+ * $Id: uart.c,v 1.1 2005/12/28 21:38:59 joerg_wunsch Exp $
+ */
 
- -----------------------------------------------------------------------
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public
-    License as published by the Free Software Foundation; either
-    version 2.1 of the License, or (at your option) any later version.
 
-    This library is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-    Lesser General Public License for more details.
+#include <stdint.h>
+#include <stdio.h>
 
-    You should have received a copy of the GNU Lesser General Public
-    License along with the SDCC package; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
--------------------------------------------------------------------------*/
-#include"pic/pic16f88.h"   // one can use other pic14 device with hardware usart
+#include <avr/io.h>
 
-//#include "sdccEE.c"        // no other interfaces this time
-#define bd110   0
-#define bd300   1
-#define bd600   2
-#define bd1200  3
-#define bd2400  4
-#define bd4800  5
-#define bd9600  6
-#define bd14k   7
-#define bd19k   8
-#define bdMIDI  9          //the author is a musician so this is included :-)
-#define bd38k   10
-#define bd56k   11
-#define bd57k   12
-#define bd115k  13
-#define bd128k  14
-#define bd256k  15
-#define _usrtReadx  label
-#define maxBuff 12;
-__data char  *cyclicBuff;
-       unsigned int buffTail, buffHead;
+#include "uart.h"
 
-void Usart_Init(const unsigned int baudrate)
-{ /* Initializes the USART and enables the
-     USAR HW interrupt. It is up to the user
-     to enable the Global Interrupt Flag GIE */
-     SPEN = 1;
-     CREN = 1;
-
-     TX9 = 0;
-     switch (baudrate){
-        case bd9600:  SPBRG = 51;
-                      BRGH = 1;
-                      break;
-        default    :  SPBRG = 51;
-                      BRGH = 1;
-
-        }
-     TXEN = 1;
-
-     RCIF = 0;
-     PEIE = 0;
-     GIE  = 0;
-
-}
-void Usart_OFF(void)
-{SPEN = 0;
-}
-
-unsigned char Usart_Data_Ready(void)
+/*
+ * Initialize the UART to 9600 Bd, tx/rx, 8N1.
+ */
+void
+uart_init(void)
 {
-        return RCIF;
+    // Set baud rate to 9600
+    UBRRH = (unsigned char)(12>>8);
+    UBRRL = (unsigned char) 12;
+
+    // Enable 2x speed
+    UCSRA = (1<<U2X);
+
+    // Enable receiver and transmitter
+    UCSRB = (1<<RXEN)|(1<<TXEN)|(0<<RXCIE)|(0<<UDRIE);
+
+    // Async. mode, 8N1
+    UCSRC = (0<<UMSEL)|(0<<UPM0)|(0<<USBS)|(3<<UCSZ0)|(0<<UCPOL);
 }
 
-void Usart_Write( unsigned char _data)
+/*
+ * Send character c down the UART Tx, wait until tx holding register
+ * is empty.
+ */
+int
+uart_putchar(char c, FILE *stream)
 {
-  while(!TXIF);   // loop until the register get's emptied
 
-   TXREG = _data;          // this action clears TXIF also;
+  if (c == '\a')
+    {
+      fputs("*ring*\n", stderr);
+      return 0;
+    }
 
- }
+  if (c == '\n')
+    uart_putchar('\r', stream);
+  loop_until_bit_is_set(UCSRA, UDRE);
+  UDR = c;
 
-unsigned char Usart_Read(void)
-{unsigned char rx;
- //RCIE = 0;                // disable interrupt so as no to trigger during read
- if (FERR) goto _usrtReadx; //  read RCREG if there is framing err to reset it.
- //if (FERR) rx = RCREG;
- while (!RCIF);             //  wait until RCIF raises
-
-_usrtReadx:
-if (OERR) {CREN = 0; CREN = 1;} // reset overrun error flag if raised
-rx = RCREG;
-//RCIE = 1;                     // re -enable interrupt
-return rx;
+  return 0;
 }
-void Usart_Str_tx(unsigned char *str)
-{ /* sends out zero-terminated string*/
-  while(*str) {Usart_Write(*str); str++;}
-}
-void Usart_Str_rx(unsigned char *str)
-{ /* receives a series of characters and converts it to null terminated one.
-  The pointer must be a valid RAM data pointer*/
-  unsigned char strx;
- do {
-     strx = Usart_Read();
-     *str = strx;
-      str++;
- }  while (strx!=0);
- /* Add the zero-terminator at the end*/
-     *str = 0;
 
+/*
+ * Receive a character from the UART Rx.
+ *
+ * This features a simple line-editor that allows to delete and
+ * re-edit the characters entered, until either CR or NL is entered.
+ * Printable characters entered will be echoed using uart_putchar().
+ *
+ * Editing characters:
+ *
+ * . \b (BS) or \177 (DEL) delete the previous character
+ * . ^u kills the entire input buffer
+ * . ^w deletes the previous word
+ * . ^r sends a CR, and then reprints the buffer
+ * . \t will be replaced by a single space
+ *
+ * All other control characters will be ignored.
+ *
+ * The internal line buffer is RX_BUFSIZE (80) characters long, which
+ * includes the terminating \n (but no terminating \0).  If the buffer
+ * is full (i. e., at RX_BUFSIZE-1 characters in order to keep space for
+ * the trailing \n), any further input attempts will send a \a to
+ * uart_putchar() (BEL character), although line editing is still
+ * allowed.
+ *
+ * Input errors while talking to the UART will cause an immediate
+ * return of -1 (error indication).  Notably, this will be caused by a
+ * framing error (e. g. serial line "break" condition), by an input
+ * overrun, and by a parity error (if parity was enabled and automatic
+ * parity recognition is supported by hardware).
+ *
+ * Successive calls to uart_getchar() will be satisfied from the
+ * internal buffer until that buffer is emptied again.
+ */
+int
+uart_getchar(FILE *stream)
+{
+  uint8_t c;
+  char *cp, *cp2;
+  static char b[RX_BUFSIZE];
+  static char *rxp;
+
+  if (rxp == 0)
+    for (cp = b;;)
+      {
+	loop_until_bit_is_set(UCSRA, RXC);
+	if (UCSRA & _BV(FE))
+	  return _FDEV_EOF;
+	if (UCSRA & _BV(DOR))
+	  return _FDEV_ERR;
+	c = UDR;
+	/* behaviour similar to Unix stty ICRNL */
+	if (c == '\r')
+	  c = '\n';
+	if (c == '\n')
+	  {
+	    *cp = c;
+	    uart_putchar(c, stream);
+	    rxp = b;
+	    break;
+	  }
+	else if (c == '\t')
+	  c = ' ';
+
+	if ((c >= (uint8_t)' ' && c <= (uint8_t)'\x7e') ||
+	    c >= (uint8_t)'\xa0')
+	  {
+	    if (cp == b + RX_BUFSIZE - 1)
+	      uart_putchar('\a', stream);
+	    else
+	      {
+		*cp++ = c;
+		uart_putchar(c, stream);
+	      }
+	    continue;
+	  }
+
+	switch (c)
+	  {
+	  case 'c' & 0x1f:
+	    return -1;
+
+	  case '\b':
+	  case '\x7f':
+	    if (cp > b)
+	      {
+		uart_putchar('\b', stream);
+		uart_putchar(' ', stream);
+		uart_putchar('\b', stream);
+		cp--;
+	      }
+	    break;
+
+	  case 'r' & 0x1f:
+	    uart_putchar('\r', stream);
+	    for (cp2 = b; cp2 < cp; cp2++)
+	      uart_putchar(*cp2, stream);
+	    break;
+
+	  case 'u' & 0x1f:
+	    while (cp > b)
+	      {
+		uart_putchar('\b', stream);
+		uart_putchar(' ', stream);
+		uart_putchar('\b', stream);
+		cp--;
+	      }
+	    break;
+
+	  case 'w' & 0x1f:
+	    while (cp > b && cp[-1] != ' ')
+	      {
+		uart_putchar('\b', stream);
+		uart_putchar(' ', stream);
+		uart_putchar('\b', stream);
+		cp--;
+	      }
+	    break;
+	  }
+      }
+
+  c = *rxp++;
+  if (c == '\n')
+    rxp = 0;
+
+  return c;
 }
-void Usart_Read_Send(void) // terminal echo just for testing
-{ unsigned char rx;
-  rx = Usart_Read();
-  Usart_Write(rx);
-}
+
