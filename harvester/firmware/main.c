@@ -1,8 +1,7 @@
 #define __16f88
 #include "pic/pic16f88.h"
-#include "bitop.h"
 
-# include "uart.c"
+#include "bitop.h"
 
 typedef unsigned int config;
 config at 0x2007 __CONFIG = _CP_OFF & 
@@ -13,80 +12,340 @@ config at 0x2007 __CONFIG = _CP_OFF &
  _MCLR_ON & 
  _LVP_OFF;
 
+
+#define LED_PORT PORTB
+#define LED_PIN 4
+
+/*
+//LCD specific defines
+#define LCD_SER_PIN     PORTB.7 //RB7 (Pin 13)
+#define LCD_SCK_PIN     PORTB.6 //RB6 (Pin 12)
+#define LCD_RCK_PIN     PORTB.3 //RB3 (Pin 9)*/
+
+// Function set command
+#define FUNCTION_SET    0b00111011  // 8-bit interface, 5x8 characters, multiple lines
+
+// Display ON/OFF Control defines
+#define DON         0b00001111  /* Display on      */
+#define DOFF        0b00001011  /* Display off     */
+#define CURSOR_ON   0b00001111  /* Cursor on       */
+#define CURSOR_OFF  0b00001101  /* Cursor off      */
+#define BLINK_ON    0b00001111  /* Cursor Blink    */
+#define BLINK_OFF   0b00001110  /* Cursor No Blink */
+
+// Cursor or Display Shift defines
+#define SHIFT_CUR_LEFT    0b00010011  /* Cursor shifts to the left   */
+#define SHIFT_CUR_RIGHT   0b00010111  /* Cursor shifts to the right  */
+#define SHIFT_DISP_LEFT   0b00011011  /* Display shifts to the left  */
+#define SHIFT_DISP_RIGHT  0b00011111  /* Display shifts to the right */
+
+//LCD variables
+// Buffer of characters for the LCD: Lcd_Buf{row}[{column}]
+/*unsigned char Lcd_Buf0[16];
+unsigned char Lcd_Buf1[16];
+
+//will not be part of library:
+bit Update_Lcd_Buf;
+
+bit Lcd_Ready, Lcd_Rs_Buf;
+unsigned Lcd_Cmd_Buf;*/
+
 void intHand(void) __interrupt 0
 {
-   if (RCIF) {
-        RCIE = 0;
-        Usart_Read_Send();
-        RCIE = 1;
+    static unsigned led_count;
+
+    if (TMR0IE && TMR0IF) {
+//        Lcd_Ready = 1;
+        if (led_count > 49) {
+            toggle_bit(LED_PORT, LED_PIN);
+            led_count = 0;
+//            Update_Lcd_Buf = 1;
+        } else {
+            led_count++;
+        }
+
+        TMR0IF=0;
     }
 }
 
-#define COLOURPORT PORTB
-#define RED 0
-#define GREEN 1
-#define BLUE 3
-
 void setup(void) {
-	OSCCON=0b01110000; //8MHz
+    OSCCON=0b01110000; //8MHz
 
-	//Ports
-	TRISA=0b11111111;
-	PORTA=0b00000000;
- 	TRISB=0b11110100;
-	PORTB=0b00000000;
-	
-	Usart_Init(bd9600);
-	Usart_Str_tx("Booted!\n");
+    //Ports
+    TRISA=0b11111111;
+    PORTA=0b00000000;
+    TRISB=0b00000000;
+    PORTB=0b00000000;
+
+
+    GIE = 1; //Enable interrupts
+
+
+    //Initialize Timer0 - used for LCD refresh rate and long-term timebase
+    OPTION_REG = 4; // 1:32 prescaler, giving XLCD 4.1ms for Cmd cycles
+    TMR0IE = 1;
+    TMR0 = 0;
 }
 
-print_number(unsigned char number) {
-    unsigned char digit;
-    
-    digit=number/100;
-    number%=100;
-    Usart_Write(digit+'0');
-    
-    digit=number/10;
-    number%=10;
-    Usart_Write(digit+'0');
-    
-    Usart_Write(number+'0');
-    
-    Usart_Write(' ');
+//LCD functions
+/*
+ *  Updates the LCD controller with current data from the LCD buffer. One 
+ *  character or command is updated per call. Allow time in-between calls for 
+ *  the LCD controller to process commands.
+ *//*
+void lcd_update(void)
+{
+    static uns8 column;
+    static bit row;
+
+    // determine the appropriate value for the XLCD shift register
+    if (!Lcd_Cmd_Buf) {  // allows for external XLCD commands
+        if (column > 16) { // We have reached the end of the current row
+            if (row == 1) {
+                lcd_set_ddram_addr(0); // Set cursor to start of 1st row
+                row = 0;
+            } else {
+                lcd_set_ddram_addr(40); // Set cursor to start of 2nd row
+                row = 1;
+            }
+            column = 0;
+        } else {
+            if (row == 0) {
+                Lcd_Cmd_Buf = Lcd_Buf0[column];
+            } else {
+                Lcd_Cmd_Buf = Lcd_Buf1[column];
+            }
+            if (Lcd_Cmd_Buf == '\0') // Remove NULL terminating character
+                Lcd_Cmd_Buf = ' ';
+            Lcd_Rs_Buf = 1; // RS_PIN = 1 for sending data
+            column++;
+        }
+    }
+
+    // Update the shift registers
+    LCD_RCK_PIN = 0;
+
+    unsigned char mask; // 8-bit-mask
+
+    for (mask = 0b10000000; mask > 0; mask >>= 1) {
+        LCD_SCK_PIN = 0;
+        if (Lcd_Cmd_Buf & mask) {
+            LCD_SER_PIN = 1;
+        } else {
+            LCD_SER_PIN = 0;
+        }
+        nop();
+        LCD_SCK_PIN = 1;            // Shift data on the rising edge of clock
+    }
+
+    LCD_SER_PIN = Lcd_Rs_Buf;    // LCD_SER_PIN is mulitplexed to the XLCD's RS pin
+
+    short_delay();
+    LCD_RCK_PIN = 1;                // Clock the command in
+    short_delay();
+    LCD_RCK_PIN = 0;
+
+    short_delay();
+    short_delay();
+    short_delay();
+    short_delay();
+    short_delay();
+
+    Lcd_Cmd_Buf = 0; // Empty XLCD cmd buffer, ready for more
+    Lcd_Ready = 0; // Unset XLCD ready flag for delay
+
+    return;
 }
+
+void short_delay(void)
+{
+    nop();
+    nop();
+}
+
+void long_delay(void)
+{
+    char millisec = 5;
+    char next = 0;
+
+    OPTION = 2; // prescaler divide TMR0 rate by 8
+    TMR0 = 2;  // deduct 2*8 fixed instruction cycles delay
+    do  {
+        next += 125;
+//        clrwdt();  // needed only if watchdog is enabled
+        while (TMR0 != next)   // 125 * 8 = 1000 (= 1 ms)
+            ;
+    } while (-- millisec != 0);
+
+    return;
+}*/
+
+/*
+ *  Initializes the LCD controller for 8-bit mode and clears the display. Based
+ *  on the Hitachi HD44780 LCD controller.
+ *//*
+void lcd_init(void)
+{
+    // All control signals made low
+    LCD_SER_PIN = 0;
+    LCD_SCK_PIN = 0;
+    LCD_RCK_PIN = 0;
+
+    // Delay for 15ms to allow for XLCD Power on reset
+    long_delay();
+    long_delay();
+    long_delay();
+
+    // Setup interface to XLCD
+    lcd_write_cmd (0b00110000);      // Function set cmd(8-bit interface)
+        
+    // Delay for at least 4.1ms
+    // done in lcd_write_cmd()
+
+    // Setup interface to XLCD
+    lcd_write_cmd (0b00110000);      // Function set cmd(8-bit interface)
+
+    // Delay for at least 100us
+    // done in lcd_write_cmd();
+
+    // Setup interface to XLCD
+    lcd_write_cmd (0b00110000);      // Function set cmd(8-bit interface)
+
+    // Set data interface width, # rows, font
+    lcd_write_cmd(FUNCTION_SET);         // Function set cmd
+
+    // Turn the display on then off
+    lcd_write_cmd(DOFF&CURSOR_OFF&BLINK_OFF);        // Display OFF/Blink OFF
+    lcd_write_cmd(DON&CURSOR_OFF&BLINK_OFF);           // Display ON/Blink OFF
+
+    // Clear display
+    lcd_write_cmd(0x01);             // Clear display
+
+    // Set entry mode inc, no shift
+    lcd_write_cmd(SHIFT_CUR_LEFT);   // Entry Mode
+
+    // Set DD Ram address to 0
+    lcd_set_ddram_addr(0);                // Set Display data ram address to 0
+
+    return;
+}
+*/
+/*
+ *  Writes a command to the LCD controller. Allow time in-between calls for the
+ *  LCD controller to process commands.
+ *//*
+void lcd_write_cmd(unsigned char cmd)
+{
+    Lcd_Cmd_Buf = cmd;
+    Lcd_Rs_Buf = 0;
+    lcd_update();
+    long_delay();
+
+    return;
+}
+*/
+/*
+ *  Sets the character generator address of the LCD controller. Allow time 
+ *  in-between calls for the LCD controller to process commands.
+ *//*
+void lcd_set_cgram_addr(unsigned char addr)
+{
+    Lcd_Cmd_Buf = addr | 0b01000000;
+    Lcd_Rs_Buf = 0;
+
+    return;
+}*/
+
+/*
+ *  Sets the display data address of the LCD controller. Allow time in-between 
+ *  calls for the LCD controller to process commands.
+ */
+/*
+void lcd_set_ddram_addr(unsigned char addr)
+{
+    Lcd_Cmd_Buf = addr | 0b10000000;
+    Lcd_Rs_Buf = 0;
+
+    return;
+}*/
+/*
+void lcd_write_int(unsigned long num, bit row, unsigned col, unsigned num_digits)
+// writes the ascii representation of a number to the LCD
+{
+    unsigned long digit, s;
+
+    switch (num_digits) {
+        case 4: goto four_digits;
+        case 3: goto three_digits;
+        case 2: goto two_digits;
+        case 1: goto one_digit;
+    }
+
+//five_digits:
+    digit = num / 10000;
+    s = digit * 10000;
+    num = num - s;
+    lcd_type_char('0' + digit, row, col);
+    col = 0xff; // next digit's position is auto handled by lcd_typ_char()
+    
+four_digits:
+    digit = num / 1000;
+    s = digit * 1000;
+    num = num - s;
+    lcd_type_char('0' + digit, row, col);
+    col = 0xff;
+
+three_digits:
+    digit = num / 100;
+    s = 100 * digit;
+    num = num - s;
+    lcd_type_char('0' + digit, row, col);
+    col = 0xff;
+
+two_digits:
+    digit = num / 10;
+    s = digit * 10;
+    num = num - s;
+    lcd_type_char('0' + digit, row, col);
+    col = 0xff;
+
+one_digit:
+    lcd_type_char('0' + num, row, col);
+}
+
+void lcd_type_char(unsigned char_data, bit row, unsigned col)
+{
+    static bit  last_row;
+    static unsigned last_col;
+    
+    if (col > 15) {     // don't use absolute pos
+        row = last_row;
+        col = last_col + 1;
+        if (col > 15) { // column overflow
+            col = 0;
+            row = !row;
+        }
+    }
+    
+    if (!row)
+        Lcd_Buf0[col] = char_data;
+    else
+        Lcd_Buf1[col] = char_data;
+    
+    last_row = row;
+    last_col = col;
+}
+*/
 
 void main(void) {
-	int i;
-	int t; //use for a crude delay
-	
-	long int r,g,b,cycle;
-	long int steps,step; //used for animation
-	char a;
-	
-	setup();
-	
-	cycle=255;
-	r=0;
-	g=128;
-	b=255;
-	
-	steps=0;
-	step=1;
-	
-	while(1) {
-		//pwm
-		if(r>0) set_bit(COLOURPORT,RED);
-		if(g>0) set_bit(COLOURPORT,GREEN);
-		if(b>0) set_bit(COLOURPORT,BLUE);
-		for(i=0;i<cycle;i++) {
-			if(i==r)
-				clear_bit(COLOURPORT,RED);
-			if(i==g)
-				clear_bit(COLOURPORT,GREEN);
-			if(i==b)
-				clear_bit(COLOURPORT,BLUE);
-			for(t=0;t<5;t++);
-		}
-	}
+    
+    setup();
+    
+    PORTB = 0xff;
+    clear_bit(PORTB, 1);
+    
+    while(1) {
+//        if (Lcd_Ready)
+//            lcd_update();
+    }
 }
