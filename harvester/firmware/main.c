@@ -3,6 +3,8 @@
 2010-11-20: got LCD working! the culprits: 1. PORTB defaults to analog output
     2. 'char' defaults to signed in SDCC!
     lesson learned: explicitly specify types for portability!
+2010-11-21: moved LCD into it's own library with cleaned interface
+
 */
 
 #define __16f88
@@ -25,7 +27,7 @@ config at 0x2007 __CONFIG = _CP_OFF &
 
 #define nop() \
         _asm\
-        NOP\
+        nop\
         _endasm
 
 
@@ -81,7 +83,7 @@ void main(void) {
     
     while (1) {
         if (Lcd_Ready) {
-            lcd_type_char('H', 0, 0);
+            lcd_type_char('H', 1, 3);
             lcd_type_char('e', 0, 0xff);
             lcd_type_char('l', 0, 0xff);
             lcd_type_char('l', 0, 0xff);
@@ -93,7 +95,7 @@ void main(void) {
             lcd_type_char('l', 0, 0xff);
             lcd_type_char('d', 0, 0xff);
             lcd_type_char('!', 0, 0xff);
-            lcd_update();
+            lcd_update(0, 0);//update from buffer
             Lcd_Ready = 0; // Unset LCD ready flag for delay
 
         }
@@ -147,7 +149,7 @@ one_digit:
     lcd_type_char('0' + num, row, col);
 }*/
 
-void lcd_type_char(unsigned char char_data, unsigned char row, unsigned char col)
+void lcd_type_char(unsigned char char_buf, unsigned char row, unsigned char col)
 {
     static unsigned char last_row;
     static unsigned char last_col;
@@ -161,10 +163,7 @@ void lcd_type_char(unsigned char char_data, unsigned char row, unsigned char col
         }
     }
     
-    if (!row)
-        Lcd_Buf0[col] = char_data;
-    else
-        Lcd_Buf1[col] = char_data;
+    Lcd_Buf[row][col] = char_buf;
     
     last_row = row;
     last_col = col;
