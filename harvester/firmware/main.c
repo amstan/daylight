@@ -1,3 +1,10 @@
+/* main.c
+
+2010-11-20: got LCD working! the culprits: 1. PORTB defaults to analog output
+    2. 'char' defaults to signed in SDCC!
+    lesson learned: explicitly specify types for portability!
+*/
+
 #define __16f88
 #include "pic/pic16f88.h"
 
@@ -13,14 +20,17 @@ config at 0x2007 __CONFIG = _CP_OFF &
  _LVP_OFF;
 
 
-#define LED_PORT PORTB
-#define LED_PIN 4
+#define LED_PIN RB4
 
-/*
+#define nop() \
+        _asm\
+        NOP\
+        _endasm
+
 //LCD specific defines
-#define LCD_SER_PIN     PORTB.7 //RB7 (Pin 13)
-#define LCD_SCK_PIN     PORTB.6 //RB6 (Pin 12)
-#define LCD_RCK_PIN     PORTB.3 //RB3 (Pin 9)*/
+#define LCD_SER_PIN     RB7
+#define LCD_SCK_PIN     RB6
+#define LCD_RCK_PIN     RB3
 
 // Function set command
 #define FUNCTION_SET    0b00111011  // 8-bit interface, 5x8 characters, multiple lines
@@ -41,25 +51,36 @@ config at 0x2007 __CONFIG = _CP_OFF &
 
 //LCD variables
 // Buffer of characters for the LCD: Lcd_Buf{row}[{column}]
-/*unsigned char Lcd_Buf0[16];
+unsigned char Lcd_Buf0[16];
 unsigned char Lcd_Buf1[16];
 
 //will not be part of library:
-bit Update_Lcd_Buf;
+unsigned char Update_Lcd_Buf;
 
-bit Lcd_Ready, Lcd_Rs_Buf;
-unsigned Lcd_Cmd_Buf;*/
+unsigned char Lcd_Ready, Lcd_Rs_Buf;
+unsigned char Lcd_Cmd_Buf;
+
+//LCD functions
+void lcd_update(void);
+void short_delay(void);
+void long_delay(void);
+void lcd_init(void);
+void lcd_write_cmd(unsigned char);
+void lcd_set_ddram_addr(unsigned char);
+void lcd_set_cgram_addr(unsigned char);
+
+void lcd_type_char(unsigned char, unsigned char, unsigned char);
 
 void intHand(void) __interrupt 0
 {
-    static unsigned led_count;
+    static unsigned char led_count;
 
     if (TMR0IE && TMR0IF) {
-//        Lcd_Ready = 1;
+        Lcd_Ready = 1;
         if (led_count > 49) {
-            toggle_bit(LED_PORT, LED_PIN);
+            LED_PIN = !LED_PIN;
             led_count = 0;
-//            Update_Lcd_Buf = 1;
+            Update_Lcd_Buf = 1;
         } else {
             led_count++;
         }
@@ -77,9 +98,12 @@ void setup(void) {
     TRISB=0b00000000;
     PORTB=0b00000000;
 
+    ANSEL=0;//This is needed! PORTA defaults to analog input!
+
+    lcd_init(); //should happen before interrupts and timer settings, i think
+
 
     GIE = 1; //Enable interrupts
-
 
     //Initialize Timer0 - used for LCD refresh rate and long-term timebase
     OPTION_REG = 4; // 1:32 prescaler, giving XLCD 4.1ms for Cmd cycles
@@ -87,16 +111,35 @@ void setup(void) {
     TMR0 = 0;
 }
 
-//LCD functions
+
+void main(void) {
+    setup();
+    
+    LCD_SER_PIN = 0;
+    while (1) {
+        if (Lcd_Ready) {
+            lcd_type_char('0' + 4, 1, 1);
+            lcd_type_char('0' + 5, 0, 0xff);
+            lcd_type_char('0' + 6, 0, 0xff);
+            lcd_type_char('0' + 7, 0, 0xff);
+            lcd_update();
+        }
+    }
+}
+
+
+
 /*
  *  Updates the LCD controller with current data from the LCD buffer. One 
  *  character or command is updated per call. Allow time in-between calls for 
  *  the LCD controller to process commands.
- *//*
+ */
 void lcd_update(void)
 {
-    static uns8 column;
-    static bit row;
+    static unsigned char column;
+    static unsigned char row;
+    
+    unsigned char mask; // 8-bit-mask
 
     // determine the appropriate value for the XLCD shift register
     if (!Lcd_Cmd_Buf) {  // allows for external XLCD commands
@@ -124,8 +167,6 @@ void lcd_update(void)
 
     // Update the shift registers
     LCD_RCK_PIN = 0;
-
-    unsigned char mask; // 8-bit-mask
 
     for (mask = 0b10000000; mask > 0; mask >>= 1) {
         LCD_SCK_PIN = 0;
@@ -165,10 +206,10 @@ void short_delay(void)
 
 void long_delay(void)
 {
-    char millisec = 5;
-    char next = 0;
+    unsigned char millisec = 5;
+    unsigned char next = 0;
 
-    OPTION = 2; // prescaler divide TMR0 rate by 8
+    OPTION_REG = 2; // prescaler divide TMR0 rate by 8
     TMR0 = 2;  // deduct 2*8 fixed instruction cycles delay
     do  {
         next += 125;
@@ -178,12 +219,12 @@ void long_delay(void)
     } while (-- millisec != 0);
 
     return;
-}*/
+}
 
 /*
  *  Initializes the LCD controller for 8-bit mode and clears the display. Based
  *  on the Hitachi HD44780 LCD controller.
- *//*
+ */
 void lcd_init(void)
 {
     // All control signals made low
@@ -229,11 +270,11 @@ void lcd_init(void)
 
     return;
 }
-*/
+
 /*
  *  Writes a command to the LCD controller. Allow time in-between calls for the
  *  LCD controller to process commands.
- *//*
+ */
 void lcd_write_cmd(unsigned char cmd)
 {
     Lcd_Cmd_Buf = cmd;
@@ -243,31 +284,31 @@ void lcd_write_cmd(unsigned char cmd)
 
     return;
 }
-*/
+
 /*
  *  Sets the character generator address of the LCD controller. Allow time 
  *  in-between calls for the LCD controller to process commands.
- *//*
+ */
 void lcd_set_cgram_addr(unsigned char addr)
 {
     Lcd_Cmd_Buf = addr | 0b01000000;
     Lcd_Rs_Buf = 0;
 
     return;
-}*/
+}
 
 /*
  *  Sets the display data address of the LCD controller. Allow time in-between 
  *  calls for the LCD controller to process commands.
  */
-/*
+
 void lcd_set_ddram_addr(unsigned char addr)
 {
     Lcd_Cmd_Buf = addr | 0b10000000;
     Lcd_Rs_Buf = 0;
 
     return;
-}*/
+}
 /*
 void lcd_write_int(unsigned long num, bit row, unsigned col, unsigned num_digits)
 // writes the ascii representation of a number to the LCD
@@ -311,12 +352,12 @@ two_digits:
 
 one_digit:
     lcd_type_char('0' + num, row, col);
-}
+}*/
 
-void lcd_type_char(unsigned char_data, bit row, unsigned col)
+void lcd_type_char(unsigned char char_data, unsigned char row, unsigned char col)
 {
-    static bit  last_row;
-    static unsigned last_col;
+    static unsigned char last_row;
+    static unsigned char last_col;
     
     if (col > 15) {     // don't use absolute pos
         row = last_row;
@@ -335,17 +376,4 @@ void lcd_type_char(unsigned char_data, bit row, unsigned col)
     last_row = row;
     last_col = col;
 }
-*/
 
-void main(void) {
-    
-    setup();
-    
-    PORTB = 0xff;
-    clear_bit(PORTB, 1);
-    
-    while(1) {
-//        if (Lcd_Ready)
-//            lcd_update();
-    }
-}
