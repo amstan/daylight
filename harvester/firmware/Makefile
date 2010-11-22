@@ -25,7 +25,7 @@ PRJ          = daylight
 # Used modules, the first should contain the main() function
 # Assembly modules should have extention ".S", because the current clean up!
 #
-SRCS_C       := main.c
+SRCS_C       := main.c lcd.c
 SRCS_ASM     :=
 #
 #----------------------------------------------------------------------------
@@ -90,7 +90,7 @@ SDCC_FLAGS   =  -S -m$(ARCH) -p$(CPU) --debug -c
 GPASM_FLAGS  = -g
 GPLINK_FLAGS = -c -m -w -r -I $(LIBDIR) -s $(GPUTILSDIR)/lkr/$(CPU).lkr
 PROGRAMMER_FLAGS = -Ppic$(CPU) -J 
-RUN_VOLTAGE = 3.3
+RUN_VOLTAGE = 5.0
 #
 ###############################################################################
 #
