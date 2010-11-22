@@ -397,7 +397,7 @@ def main():
         action = "store",
         type = 'int',
         help = "set baud rate, default %default",
-        default = 9600
+        default = 19200
     )
 
     parser.add_option("--parity",

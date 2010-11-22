@@ -24,7 +24,7 @@ void setup(void) {
 	PORTB=0b00000000;
 	
 	//UART
-	uart_init();
+	uart_init(19200);
 	stdout = stdin = &uart_str;
 	printf("Booted!\n");
 }

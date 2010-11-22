@@ -14,8 +14,9 @@
 
 /*! Perform UART startup initialization.
  * Initialize the UART to 9600 Bd, tx/rx, 8N1.
+ * @param baud baud to run the serial port at
  */
-void uart_init(void);
+void uart_init(int baud);
 
 /*! Send character c down the UART Tx
  * Wait until tx holding register is empty.

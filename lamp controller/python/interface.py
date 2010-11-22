@@ -33,7 +33,7 @@ def parse_colour(string):
 		colour=map(int,string)
 	return colour
 
-s=serial.Serial("/dev/ttyUSB0",600,timeout=0.1)
+s=serial.Serial("/dev/ttyUSB0",19200,timeout=0.1)
 s.close()
 s.open()
 
@@ -80,6 +80,6 @@ colours="""#DCDCDC
 
 while(1):
 	for colour in colours:
-		set_colour(parse_colour(raw_input()))
+		set_colour(parse_colour(raw_input("Colour? ")))
 		#raw_input()
 		#sleep(0.5)
