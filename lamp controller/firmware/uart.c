@@ -26,9 +26,9 @@ void
 uart_init(void)
 {
     // Set baud rate to 9600
-    UBRRH = (unsigned char)(12>>8);
-    UBRRL = (unsigned char) 12;
-
+    UBRRH = (unsigned char)(25>>8);
+    UBRRL = (unsigned char) 25;
+    
     // Enable 2x speed
     UCSRA = (1<<U2X);
 
