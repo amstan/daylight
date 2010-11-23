@@ -15,7 +15,7 @@
 #define GREEN 1
 #define BLUE 2
 
-#define I2C_ADD 0b11010000
+#define I2C_ADD 0b01110010
 unsigned char i2c_get(unsigned char reg) {
 	char ret;
 	ret = i2c_start(I2C_ADD+I2C_WRITE);
