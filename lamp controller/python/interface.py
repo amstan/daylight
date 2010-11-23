@@ -38,7 +38,7 @@ s.close()
 s.open()
 
 nowcolour=(0,0,0)
-steps=16
+steps=100
 
 def set_colour(colour):
 	bytes="%.2x%.2x%.2x\n" % tuple(map(int,colour))
@@ -53,7 +53,7 @@ def fade(tocolour):
 		for c in xrange(3):
 			colour.append(((i)/float(steps))*tocolour[c]+((steps-i)/float(steps))*nowcolour[c])
 		set_colour(colour)
-		sleep(0.5)
+		sleep(0.01)
 	set_colour(tocolour)
 	nowcolour=tocolour
 
@@ -79,7 +79,4 @@ colours="""#DCDCDC
 #00FF7F""".split("\n")
 
 while(1):
-	for colour in colours:
-		set_colour(parse_colour(raw_input("Colour? ")))
-		#raw_input()
-		#sleep(0.5)
+	fade(parse_colour(raw_input("Colour? ")))
