@@ -62,7 +62,7 @@ void setup(void) {
 	PORTC=0b00000011;
 	
 	//UART
-	uart_init();
+	uart_init(19200);
 	stdout = stdin = &uart_str;
 	printf("Booted!\n");
 }
@@ -71,6 +71,8 @@ void setup(void) {
 int main(void) {
 	setup();
 	i2c_init();
+	
+	//i2c_put(0x00,0x00);
 	
 	for(unsigned char i=0x00;i<=0x07;i++) {
 		printf("address %d, data %d\n\n",i,i2c_get(i));

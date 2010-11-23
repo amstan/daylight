@@ -20,14 +20,11 @@
 #include "uart.h"
 
 /*
- * Initialize the UART to 9600 Bd, tx/rx, 8N1.
+ * Initialize the UART, tx/rx, 8N1.
  */
 void
-uart_init(void)
+uart_init(int baud)
 {
-    // Set baud rate to 9600
-    UBRRH = (unsigned char)(25>>8);
-    UBRRL = (unsigned char) 25;
     
     // Enable 2x speed
     UCSRA = (1<<U2X);
@@ -37,6 +34,11 @@ uart_init(void)
 
     // Async. mode, 8N1
     UCSRC = (0<<UMSEL)|(0<<UPM0)|(0<<USBS)|(3<<UCSZ0)|(0<<UCPOL);
+    
+    // Set baud 
+    #define BAUD_PRESCALE (((F_CPU / (baud * 8UL))) - 1)
+    UBRRH = (unsigned char)(BAUD_PRESCALE>>8);
+    UBRRL = (unsigned char) BAUD_PRESCALE;
 }
 
 /*
