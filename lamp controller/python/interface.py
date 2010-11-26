@@ -4,6 +4,7 @@ from time import sleep
 import serial
 import readline
 import random
+from colour import rgb, hsv, mix
 
 def mousepos():
 	import Xlib.display # python-xlib
@@ -20,25 +21,11 @@ def get_pixel_colour(i_x, i_y):
 	lf_colour = PIL.ImageStat.Stat(o_pil_image_rgb).mean
 	return tuple(map(int, lf_colour))
 
-def parse_colour(string):
-	if string[0]=="#":
-		#hex style
-		string=string[1:]
-		if len(string)==3:
-			colour=map(lambda x: int(x,16)*0x11,string)
-		if len(string)==6:
-			colour=map(lambda x: int(x,16),(string[0:2],string[2:4],string[4:6]))
-	else:
-		string=string.split(",")
-		colour=map(int,string)
-	return colour
-
 s=serial.Serial("/dev/ttyUSB0",19200,timeout=0.1)
 s.close()
 s.open()
 
-nowcolour=(0,0,0)
-steps=100
+nowcolour=rgb.from_string("red")
 
 def set_colour(colour):
 	bytes="%.2x%.2x%.2x\n" % tuple(map(int,colour))
@@ -46,37 +33,19 @@ def set_colour(colour):
 	s.write(bytes)
 	s.flushOutput()
 
-def fade(tocolour):
+def fade(tocolour,time=1):
+	tocolour=tocolour
+	delay=0.01
+	steps=time/delay
 	global nowcolour
 	for i in xrange(steps):
-		colour=[]
-		for c in xrange(3):
-			colour.append(((i)/float(steps))*tocolour[c]+((steps-i)/float(steps))*nowcolour[c])
-		set_colour(colour)
-		sleep(0.01)
+		set_colour(mix(nowcolour,tocolour,i/steps))
+		sleep(delay)
 	set_colour(tocolour)
 	nowcolour=tocolour
 
-colours="""#DCDCDC
-#E49B0F
-#F8F8FF
-#6082B6
-#D4AF37
-#FFD700
-#996515
-#FCC200
-#FFDF00
-#DAA520
-#A8E4A0
-#808080
-#465945
-#00FF00
-#008000
-#00A550
-#66B032
-#ADFF2F
-#A99A86
-#00FF7F""".split("\n")
-
 while(1):
-	fade(parse_colour(raw_input("Colour? ")))
+	try:
+		fade(rgb.from_string(raw_input("Colour> ")),2)
+	except Exception as e:
+		print e
