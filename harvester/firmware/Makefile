@@ -25,7 +25,7 @@ PRJ          = daylight
 # Used modules, the first should contain the main() function
 # Assembly modules should have extention ".S", because the current clean up!
 #
-SRCS_C       := main.c lcd.c
+SRCS_C       := main.c lcd.c i2c.c
 SRCS_ASM     :=
 #
 #----------------------------------------------------------------------------
