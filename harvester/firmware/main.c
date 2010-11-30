@@ -1,9 +1,15 @@
 /* main.c
 
-2010-11-20: got LCD working! the culprits: 1. PORTB defaults to analog output
+2010-11-20
+    got LCD working! the culprits: 1. PORTB defaults to analog output
     2. 'char' defaults to signed in SDCC!
     lesson learned: explicitly specify types for portability!
-2010-11-21: moved LCD into it's own library with cleaned interface
+2010-11-21
+    moved LCD into it's own library with cleaned interface
+2010-11-22
+    added i2c code; resolved issue with code pages?
+2010-11-29
+    fixed i2c code to avoid read-modify-write issue!
 
 */
 
@@ -12,6 +18,7 @@
 
 #include "bitop.h"
 #include "lcd.h"
+#include "i2c.h"
 
 typedef unsigned int config;
 config at 0x2007 __CONFIG = _CP_OFF & 
@@ -36,6 +43,8 @@ unsigned char Update_Lcd_Buf;
 unsigned char Lcd_Ready;
 
 void lcd_type_char(unsigned char, unsigned char, unsigned char);
+void lcd_write_int(unsigned int, unsigned char, unsigned char, unsigned char);
+
 
 void intHand(void) __interrupt 0
 {
@@ -43,7 +52,7 @@ void intHand(void) __interrupt 0
 
     if (TMR0IE && TMR0IF) {
         Lcd_Ready = 1;
-        if (led_count > 49) {
+        if (led_count > 249) {
             LED_PIN = !LED_PIN;
             led_count = 0;
             Update_Lcd_Buf = 1;
@@ -59,11 +68,14 @@ void setup(void) {
     OSCCON=0b01110000; //8MHz
 
     //Ports
-    TRISA=0b11111111;
+    TRISA=0b00000000;
     PORTA=0b00000000;
     TRISB=0b00000000;
     PORTB=0b00000000;
 
+    CMCON=0b00000111; //Turn off comparator on RA port
+    //shouldn't be needed due to POR defaults
+    
     ANSEL=0;//This is needed! PORTA defaults to analog input!
 
     lcd_init(); //should happen before interrupts and timer settings, i think
@@ -79,11 +91,33 @@ void setup(void) {
 
 
 void main(void) {
+    unsigned char i, temp;
     setup();
-    
+
+    //turn on
+    i2c_start();
+    i2c_tx(0b01110010);
+    i2c_tx(0x00|0b10100000);
+    i2c_tx(0b00000011);
+    i2c_stop();
+
+            
     while (1) {
+
         if (Lcd_Ready) {
-            lcd_type_char('H', 1, 3);
+            i2c_start();
+            i = i2c_tx(0b01110010);
+            i2c_tx(0x10|0b10100000);
+            i2c_start();
+            i2c_tx(0b01110011);
+
+            temp = i2c_rx(0);
+            i2c_stop();
+            
+            lcd_write_int(i, 0, 0, 1);
+            lcd_write_int(temp, 0, 3, 3);
+            
+            lcd_type_char('H', 1, 3 + LED_PIN);
             lcd_type_char('e', 0, 0xff);
             lcd_type_char('l', 0, 0xff);
             lcd_type_char('l', 0, 0xff);
@@ -95,6 +129,7 @@ void main(void) {
             lcd_type_char('l', 0, 0xff);
             lcd_type_char('d', 0, 0xff);
             lcd_type_char('!', 0, 0xff);
+            
             lcd_update(0, 0);//update from buffer
             Lcd_Ready = 0; // Unset LCD ready flag for delay
 
@@ -104,11 +139,11 @@ void main(void) {
 
 
 
-/*
-void lcd_write_int(unsigned long num, bit row, unsigned col, unsigned num_digits)
+
+void lcd_write_int(unsigned int num, unsigned char row, unsigned char col, unsigned char num_digits)
 // writes the ascii representation of a number to the LCD
 {
-    unsigned long digit, s;
+    unsigned int digit, s;
 
     switch (num_digits) {
         case 4: goto four_digits;
@@ -147,7 +182,7 @@ two_digits:
 
 one_digit:
     lcd_type_char('0' + num, row, col);
-}*/
+}
 
 void lcd_type_char(unsigned char char_buf, unsigned char row, unsigned char col)
 {
