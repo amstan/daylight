@@ -46,7 +46,7 @@ unsigned char i2c_rx(unsigned char ack)
             d |= 1;
         SCL_PIN = SCL_TRIS = 0;
     }
-    if (ack) SDA_TRIS = 0;
+    if (ack) SDA_PIN = SDA_TRIS = 0;
     else SDA_TRIS = 1;
     SCL_TRIS = 1;
     i2c_dly();                  // send (N)ACK bit

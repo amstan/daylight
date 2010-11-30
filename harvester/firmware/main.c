@@ -52,7 +52,7 @@ void intHand(void) __interrupt 0
 
     if (TMR0IE && TMR0IF) {
         Lcd_Ready = 1;
-        if (led_count > 249) {
+        if (led_count > 49) {
             LED_PIN = !LED_PIN;
             led_count = 0;
             Update_Lcd_Buf = 1;
@@ -91,7 +91,8 @@ void setup(void) {
 
 
 void main(void) {
-    unsigned char i, temp;
+    unsigned char i;//, temp;
+    unsigned int sen_long, sen_medm, sen_shrt;
     setup();
 
     //turn on
@@ -100,24 +101,49 @@ void main(void) {
     i2c_tx(0x00|0b10100000);
     i2c_tx(0b00000011);
     i2c_stop();
+    
+    //set timing
+    i2c_start();
+    i2c_tx(0b01110010);
+    i2c_tx(0x01|0b10100000);
+    i2c_tx(0b00000010);
+    i2c_stop();
+    //set gain
+    i2c_start();
+    i2c_tx(0b01110010);
+    i2c_tx(0x07|0b10100000);
+    i2c_tx(0b00100000);
+    i2c_stop();
 
             
     while (1) {
 
         if (Lcd_Ready) {
+            //clear LCD
+            for (i=0; i < 32; i++)
+                lcd_type_char(' ', 0, 0xff);
+            
             i2c_start();
             i = i2c_tx(0b01110010);
             i2c_tx(0x10|0b10100000);
             i2c_start();
             i2c_tx(0b01110011);
-
-            temp = i2c_rx(0);
+            
+            sen_medm = i2c_rx(1);
+            sen_medm += 256 * i2c_rx(1);
+            sen_long = i2c_rx(1);
+            sen_long += 256 * i2c_rx(1);
+            sen_shrt = i2c_rx(1);
+            sen_shrt += 256 * i2c_rx(0);
             i2c_stop();
+
             
-            lcd_write_int(i, 0, 0, 1);
-            lcd_write_int(temp, 0, 3, 3);
+            lcd_write_int(i, 1, 0, 1);
+            lcd_write_int(sen_long, 0, 0, 5);
+            lcd_write_int(sen_medm, 0, 6, 5);
+            lcd_write_int(sen_shrt, 1, 2, 5);
             
-            lcd_type_char('H', 1, 3 + LED_PIN);
+            /*lcd_type_char('H', 1, 3 + LED_PIN);
             lcd_type_char('e', 0, 0xff);
             lcd_type_char('l', 0, 0xff);
             lcd_type_char('l', 0, 0xff);
@@ -128,7 +154,7 @@ void main(void) {
             lcd_type_char('r', 0, 0xff);
             lcd_type_char('l', 0, 0xff);
             lcd_type_char('d', 0, 0xff);
-            lcd_type_char('!', 0, 0xff);
+            lcd_type_char('!', 0, 0xff);*/
             
             lcd_update(0, 0);//update from buffer
             Lcd_Ready = 0; // Unset LCD ready flag for delay
