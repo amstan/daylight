@@ -21,15 +21,14 @@ def get_pixel_colour(i_x, i_y):
 	lf_colour = PIL.ImageStat.Stat(o_pil_image_rgb).mean
 	return tuple(map(int, lf_colour))
 
-s=serial.Serial("/dev/ttyUSB0",19200,timeout=0.1)
+s=serial.Serial("/dev/ttyUSB2",19200,timeout=0.1)
 s.close()
 s.open()
 
-nowcolour=rgb.from_string("red")
+nowcolour=rgb.from_string("black")
 
 def set_colour(colour):
 	bytes="%.2x%.2x%.2x\n" % tuple(map(int,colour))
-	print bytes
 	s.write(bytes)
 	s.flushOutput()
 
@@ -44,8 +43,18 @@ def fade(tocolour,time=1):
 	set_colour(tocolour)
 	nowcolour=tocolour
 
+def transform(comprgb):
+	import numpy
+	comprgb=numpy.matrix(comprgb).transpose()
+	trans=numpy.matrix("0.93647 -0.14497 0.17861;0.31481 1.04921 -0.19375;-0.21214 -0.77269 1.42715")
+	ledrgb=trans*comprgb
+	return map(int,ledrgb)
+
+import math
+
 while(1):
 	try:
-		fade(rgb.from_string(raw_input("Colour> ")),2)
+		fade(rgb.from_string(raw_input("Colour? ")),10)
+		#sleep(0.05)
 	except Exception as e:
 		print e
