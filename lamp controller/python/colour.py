@@ -5,11 +5,18 @@ import colorsys
 
 class rgb(tuple):
 	def __new__(cls,r,g,b):
-		for byte in (r,g,b):
-			if byte<0:
-				byte=0
-			if byte>255:
-				byte=255
+		if r<0:
+			r=0
+		if r>255:
+			r=255
+		if g<0:
+			g=0
+		if g>255:
+			g=255
+		if b<0:
+			b=0
+		if b>255:
+			b=255
 		return tuple.__new__(cls,(r,g,b))
 	
 	@classmethod
